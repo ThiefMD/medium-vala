@@ -1,4 +1,4 @@
-project('writeas', ['vala', 'c'],
+project('medium', ['vala', 'c'],
   default_options: [
     'default_library=shared',
   ],
@@ -7,7 +7,7 @@ project('writeas', ['vala', 'c'],
 
 add_project_arguments(['--vapidir', join_paths(meson.current_source_dir(), 'vapi')], language: 'vala')
 
-libwriteas_deps = [
+libmedium_deps = [
   dependency('glib-2.0'),
   dependency('gobject-2.0'),
   dependency('gtk4'),

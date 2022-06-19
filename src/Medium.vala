@@ -94,6 +94,8 @@ namespace Medium {
 
             if (call.response_code >= 200 && call.response_code < 300) {
                 result = true;
+            } else {
+                return false;
             }
 
             try {
@@ -106,12 +108,8 @@ namespace Medium {
                     as ImageResponse;
 
                 if (response != null) {
-                    if (response.code == 201) {
-                        result = true;
-                        file_url = response.data.url;
-                    } else {
-                        warning ("Error (%d): %s", response.code, response.error_msg);
-                    }
+                    result = true;
+                    file_url = response.data.url;
                 }
             } catch (Error e) {
                 warning ("Error parsing response: %s", e.message);
@@ -165,7 +163,9 @@ namespace Medium {
                 make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
             }
 
-            make_post.perform_call ();
+            if (!make_post.perform_call ()) {
+                return false;
+            }
 
             try {
                 Json.Parser parser = new Json.Parser ();
@@ -177,11 +177,7 @@ namespace Medium {
                     as PostResponse;
 
                 if (response != null) {
-                    if (response.code == 200) {
-                        post_updated = true;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
+                    post_updated = true;
                 }
             } catch (Error e) {
                 warning ("Unable to validate token: %s", e.message);
@@ -200,7 +196,9 @@ namespace Medium {
 
             WebCall get_existing_post = new WebCall (endpoint, "posts/" + post_id);
             get_existing_post.set_get ();
-            get_existing_post.perform_call ();
+            if (!get_existing_post.perform_call ()) {
+                return false;
+            }
 
             try {
                 Json.Parser parser = new Json.Parser ();
@@ -212,91 +210,14 @@ namespace Medium {
                     as PostResponse;
 
                 if (response != null) {
-                    if (response.code == 200) {
-                        post_obtained = true;
-                        post = response.data;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
+                    post_obtained = true;
+                    post = response.data;
                 }
             } catch (Error e) {
                 warning ("Unable to validate token: %s", e.message);
             }
 
             return post_obtained;
-        }
-
-        public bool publish_collection_post (
-            out string token,
-            out string id,
-            string collection_alias,
-            string body,
-            string title,
-            string font = "serif",
-            string lang = "en",
-            bool rtl = false,
-            string created = "",
-            string user_token = "")
-        {
-            string auth_token = "";
-            token = "";
-            id = "";
-            bool published_post = false;
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (auth_token == "") {
-                warning ("User must be authenticated");
-                return false;
-            }
-
-            PostRequestData new_post = new PostRequestData ();
-            new_post.body = body;
-            new_post.title = title;
-            new_post.font = font;
-            new_post.lang = lang;
-            new_post.rtl = rtl;
-            new_post.created = created;
-
-            Json.Node root = Json.gobject_serialize (new_post);
-            Json.Generator generate = new Json.Generator ();
-            generate.set_root (root);
-            generate.set_pretty (false);
-            string request_body = generate.to_data (null);
-
-            WebCall make_post = new WebCall (endpoint, "collections/" + collection_alias + "/posts");
-            make_post.set_post ();
-            make_post.set_body (request_body);
-            make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
-
-            make_post.perform_call ();
-
-            try {
-                Json.Parser parser = new Json.Parser ();
-                parser.load_from_data (make_post.response_str);
-                Json.Node data = parser.get_root ();
-                PostResponse response = Json.gobject_deserialize (
-                    typeof (PostResponse),
-                    data)
-                    as PostResponse;
-
-                if (response != null) {
-                    if (response.code == 201) {
-                        published_post = true;
-                        token = response.data.token;
-                        id = response.data.id;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
-                }
-            } catch (Error e) {
-                warning ("Unable to publish post: %s", e.message);
-            }
-
-            return published_post;
         }
 
         public bool publish_post (
@@ -324,12 +245,19 @@ namespace Medium {
             }
 
             PostRequestData new_post = new PostRequestData ();
-            new_post.body = body;
+            new_post.content = content;
             new_post.title = title;
-            new_post.font = font;
-            new_post.lang = lang;
-            new_post.rtl = rtl;
-            new_post.created = created;
+            new_post.contentFormat = format;
+            if (license != "") {
+                new_post.license = license;
+            }
+            if (canonicalUrl != "") {
+                new_post.canonicalUrl = canonicalUrl;
+            }
+            new_post.notifyFollowers = notifyFollowers;
+            if (tags != null && tags.length != 0) {
+                new_post.tags = tags;
+            }
 
             Json.Node root = Json.gobject_serialize (new_post);
             Json.Generator generate = new Json.Generator ();
@@ -344,7 +272,9 @@ namespace Medium {
                 make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
             }
 
-            make_post.perform_call ();
+            if (!make_post.perform_call ()) {
+                return false;
+            }
 
             try {
                 Json.Parser parser = new Json.Parser ();
@@ -356,13 +286,9 @@ namespace Medium {
                     as PostResponse;
 
                 if (response != null) {
-                    if (response.code == 201) {
-                        published_post = true;
-                        token = response.data.token;
-                        id = response.data.id;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
+                    published_post = true;
+                    url = response.data.url;
+                    id = response.data.id;
                 }
             } catch (Error e) {
                 warning ("Unable to publish post: %s", e.message);
@@ -391,6 +317,10 @@ namespace Medium {
             bool res = collection_call.perform_call ();
             debug ("Got bytes: %d", res ? collection_call.response_str.length : 0);
 
+            if (!res) {
+                return false;
+            }
+
             try {
                 Json.Parser parser = new Json.Parser ();
                 parser.load_from_data (collection_call.response_str);
@@ -402,99 +332,20 @@ namespace Medium {
                     as UserCollections;
 
                 if (response != null) {
-                    if (response.code == 200) {
-                        var collection_data = json_obj.get_array_member ("data");
-                        foreach (var co in collection_data.get_elements ()) {
-                            var c_p = co.get_object ();
-                            Collection c = new Collection ();
-                            deserialize_collection (ref c, c_p);
-                            collections.append (c);
-                        }
-                        got_collections = true;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
+                    var collection_data = json_obj.get_array_member ("data");
+                    foreach (var co in collection_data.get_elements ()) {
+                        var c_p = co.get_object ();
+                        Collection c = new Collection ();
+                        deserialize_collection (ref c, c_p);
+                        collections.append (c);
                     }
+                    got_collections = true;
                 }
             } catch (Error e) {
                 warning ("Unable to get user collections: %s", e.message);
             }
 
             return got_collections;
-        }
-
-        public bool get_user_posts (ref GLib.List<Post> posts, string user_token = "") {
-            string auth_token = "";
-            bool got_posts = false;
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (auth_token == "") {
-                return false;
-            }
-
-            WebCall post_call = new WebCall (endpoint, "me/posts");
-            post_call.set_get ();
-            post_call.add_header ("Authorization", "Bearer %s".printf (auth_token));
-
-            bool res = post_call.perform_call ();
-            debug ("Got bytes: %d", res ? post_call.response_str.length : 0);
-
-            try {
-                var parser = new Json.Parser ();
-                parser.load_from_data (post_call.response_str);
-                Json.Node data = parser.get_root ();
-                var json_obj = parser.get_root ().get_object ();
-                UserPosts response = Json.gobject_deserialize (
-                    typeof (UserPosts),
-                    data)
-                    as UserPosts;
-
-                if (response != null) {
-                    if (response.code == 200) {
-                        var posts_data = json_obj.get_array_member ("data");
-                        foreach (var p in posts_data.get_elements ()) {
-                            var ip = p.get_object ();
-                            Post n_p = new Post ();
-                            n_p.title = ip.has_member ("title") ? ip.get_string_member ("title") : "";
-                            n_p.slug = ip.has_member ("slug") ? ip.get_string_member ("slug") : "";
-                            n_p.appearance = ip.has_member ("appearance") ? ip.get_string_member ("appearance") : "";
-                            n_p.language = ip.has_member ("language") ? ip.get_string_member ("language") : "";
-                            n_p.rtl = ip.has_member ("rtl") ? ip.get_boolean_member ("rtl") : false;
-                            n_p.created = ip.has_member ("created") ? ip.get_string_member ("created") : "";
-                            n_p.updated = ip.has_member ("updated") ? ip.get_string_member ("updated") : "";
-                            n_p.body = ip.has_member ("body") ? ip.get_string_member ("body") : "";
-                            n_p.views = (int) (ip.has_member ("views") ? ip.get_int_member ("views") : 0);
-                            n_p.token = ip.has_member ("token") ? ip.get_string_member ("token") : "";
-                            n_p.tags = new string[0];
-                            string[] new_tags = {};
-                            if (ip.has_member ("tags")) {
-                                var tags = ip.get_array_member ("tags");
-                                for (int i = 0; i < tags.get_length (); i++) {
-                                    new_tags += tags.get_string_element (i);
-                                }
-                            }
-                            n_p.tags = new_tags;
-                            Collection new_collection = new Collection ();
-                            var c_p = ip.get_object_member ("collection");
-                            if (c_p != null) {
-                                deserialize_collection (ref new_collection, c_p);
-                            }
-                            n_p.collection = new_collection;
-                            posts.append (n_p);
-                        }
-                        got_posts = true;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
-                }
-            } catch (Error e) {
-                warning ("Unable to get user posts: %s", e.message);
-            }
-
-            return got_posts;
         }
 
         private void deserialize_collection (ref Collection c, Json.Object c_p) {
@@ -530,6 +381,10 @@ namespace Medium {
             bool res = authentication.perform_call ();
             debug ("Got bytes: %d", res ? authentication.response_str.length : 0);
 
+            if (!res) {
+                return false;
+            }
+
             try {
                 Json.Parser parser = new Json.Parser ();
                 parser.load_from_data (authentication.response_str);
@@ -540,15 +395,11 @@ namespace Medium {
                     as MeResponse;
 
                 if (response != null) {
-                    if (response.code == 200) {
-                        logged_in = true;
-                        username = response.data.username;
-                        authenticated_user = response.data.username;
-                        authenticated_user_id = response.data.id;
-                        authenticated_user_url = response.data.url;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
+                    logged_in = true;
+                    username = response.data.username;
+                    authenticated_user = response.data.username;
+                    authenticated_user_id = response.data.id;
+                    authenticated_user_url = response.data.url;
                 }
             } catch (Error e) {
                 warning ("Unable to validate token: %s", e.message);
@@ -573,46 +424,6 @@ namespace Medium {
             }
 
             return logged_in;
-        }
-
-        public bool logout (string user_token = "") {
-            string auth_token = "";
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (auth_token == "") {
-                return false;
-            }
-
-            WebCall authentication = new WebCall (endpoint, LOGOUT);
-            authentication.set_delete ();
-            authentication.add_header ("Authorization", "Bearer %s".printf (auth_token));
-
-            bool res = authentication.perform_call ();
-            debug ("Got bytes: %d", res ? authentication.response_str.length : 0);
-
-            if (authentication.response_code != 204) {
-                try {
-                    Json.Parser parser = new Json.Parser ();
-                    parser.load_from_data (authentication.response_str);
-                    Json.Node data = parser.get_root ();
-                    Response response = Json.gobject_deserialize (
-                        typeof (Response),
-                        data)
-                        as Response;
-
-                    warning ("Unable to logout: %s", response.error_msg);
-                } catch (Error e) {
-                    warning ("Unable to logout: %s", e.message);
-                }
-                return false;
-            }
-
-            authenticated_user = null;
-            return true;
         }
     }
 
@@ -698,12 +509,14 @@ namespace Medium {
     }
 
     private class PostRequestData : GLib.Object, Json.Serializable {
-        public string body { get; set; }
         public string title { get; set; }
-        public string font { get; set; }
-        public string lang { get; set; }
-        public bool rtl { get; set; }
-        public string created { get; set; }
+        public string contentFormat { get; set; }
+        public string content { get; set; }
+        public string[] tags { get; set; }
+        public string? canonicalUrl { get; set; }
+        public string publishStatus { get; set; }
+        public string? license { get; set; }
+        public bool notifyFollowers { get; set; }
     }
 
     private class PostUpdateRequestData : GLib.Object, Json.Serializable {

@@ -1,10 +1,8 @@
-namespace Writeas {
-    public const string RENDER_MARKDOWN = "markdown";
-    public const string CLAIM_POST = "posts/claim";
+namespace Medium {
     public const string LOGOUT = "auth/me";
     public const string USER = "me";
-    public const string USER_CHANNELS = "me/channels";
-    public const string IMAGE_UPLOAD = "photos/upload";
+    public const string USER_CHANNELS = "users/%s/publications";
+    public const string IMAGE_UPLOAD = "images";
 
     public class Client {
         public string endpoint = "https://api.medium.com/v1/";
@@ -37,63 +35,6 @@ namespace Writeas {
             return true;
         }
 
-        public bool claim_post (
-            string post_id,
-            string token,
-            string user_token = "")
-        {
-            bool post_deleted = false;
-            string auth_token = "";
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (token == "" || auth_token == "") {
-                warning ("No valid way to authenticate to update post");
-                return false;
-            }
-
-            PostClaimData claim_data = new PostClaimData ();
-            claim_data.token = token;
-            claim_data.id = post_id;
-
-            Json.Node root = Json.gobject_serialize (claim_data);
-            Json.Generator generate = new Json.Generator ();
-            generate.set_root (root);
-            generate.set_pretty (false);
-            string request_body = generate.to_data (null);
-
-            WebCall claim_post = new WebCall (endpoint, CLAIM_POST);
-            claim_post.set_post ();
-            claim_post.set_body (request_body);
-            claim_post.add_header ("Authorization", "Token %s".printf (auth_token));
-            claim_post.perform_call ();
-
-            if (claim_post.response_code == 200) {
-                post_deleted = true;
-            } else {
-                try {
-                    Json.Parser parser = new Json.Parser ();
-                    parser.load_from_data (claim_post.response_str);
-                    Json.Node data = parser.get_root ();
-                    Response response = Json.gobject_deserialize (
-                        typeof (Response),
-                        data)
-                        as Response;
-
-                    if (response != null) {
-                        warning ("Error: %s", response.error_msg);
-                    }
-                } catch (Error e) {
-                    warning ("Unable to validate token: %s", e.message);
-                }
-            }
-
-            return post_deleted;
-        }
-
         public bool upload_image_simple (
             out string file_url,
             string local_file_path,
@@ -101,11 +42,6 @@ namespace Writeas {
         )
         {
             file_url = "";
-            // @TODO: Need to see how snap.as works on other hosts
-            if (!endpoint.has_prefix ("https://write.as/")) {
-                warning ("Image upload only supported for Write.as at the moment");
-                return false;
-            }
 
             string auth_token = "";
             bool result = false;
@@ -149,7 +85,7 @@ namespace Writeas {
             multipart.append_form_file ("file", upload_file.get_path (), file_mimetype, buffer);
             // multipart.append_form_string ("ref", Soup.URI.encode(upload_file.get_basename ()), file_mimetype, buffer);
 
-            WebCall call = new WebCall (image_endpoint, IMAGE_UPLOAD);
+            WebCall call = new WebCall (endpoint, IMAGE_UPLOAD);
             call.set_multipart (multipart);
             call.add_header ("Authorization", "%s".printf (auth_token));
             call.perform_call ();
@@ -181,65 +117,6 @@ namespace Writeas {
             }
 
             return result;
-        }
-
-        public bool delete_post (
-            string post_id,
-            string token = "",
-            string user_token = "")
-        {
-            bool post_deleted = false;
-            string auth_token = "";
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (token == "" && auth_token == "") {
-                warning ("No valid way to authenticate to update post");
-                return false;
-            }
-
-            PostDeleteData delete_data = new PostDeleteData ();
-            delete_data.token = token;
-
-            Json.Node root = Json.gobject_serialize (delete_data);
-            Json.Generator generate = new Json.Generator ();
-            generate.set_root (root);
-            generate.set_pretty (false);
-            string request_body = generate.to_data (null);
-
-            WebCall delete_post = new WebCall (endpoint, "posts/" + post_id);
-            delete_post.set_delete ();
-            delete_post.set_body (request_body);
-            if (auth_token != "") {
-                delete_post.add_header ("Authorization", "Token %s".printf (auth_token));
-            }
-
-            delete_post.perform_call ();
-
-            if (delete_post.response_code == 204) {
-                post_deleted = true;
-            } else {
-                try {
-                    Json.Parser parser = new Json.Parser ();
-                    parser.load_from_data (delete_post.response_str);
-                    Json.Node data = parser.get_root ();
-                    Response response = Json.gobject_deserialize (
-                        typeof (Response),
-                        data)
-                        as Response;
-
-                    if (response != null) {
-                        warning ("Error: %s", response.error_msg);
-                    }
-                } catch (Error e) {
-                    warning ("Unable to validate token: %s", e.message);
-                }
-            }
-
-            return post_deleted;
         }
 
         public bool update_post (
@@ -828,11 +705,8 @@ namespace Writeas {
     }
 
     public class Image : GLib.Object, Json.Serializable {
-        public string id { get; set; }
-        public string body { get; set; }
-        public string filename { get; set; }
-        public int size { get; set; }
         public string url { get; set; }
+        public string md5 { get; set; }
     }
 
     public class Post : GLib.Object, Json.Serializable {

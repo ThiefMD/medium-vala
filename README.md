@@ -1,4 +1,4 @@
-# writeas-vala
+# medium-vala
 
 Unofficial [Medium](https://medium.com) API client library for Vala. Still a work in progress.
 

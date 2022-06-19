@@ -7,6 +7,8 @@ namespace Medium {
     public class Client {
         public string endpoint = "https://api.medium.com/v1/";
         private string? authenticated_user;
+        private string? authenticated_user_id;
+        private string? authenticated_user_url;
 
         public Client (string url = "") {
             if (url.chomp ().chug () != "") {
@@ -160,7 +162,7 @@ namespace Medium {
             make_post.set_get ();
             make_post.set_body (request_body);
             if (auth_token != "") {
-                make_post.add_header ("Authorization", "Token %s".printf (auth_token));
+                make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
             }
 
             make_post.perform_call ();
@@ -268,7 +270,7 @@ namespace Medium {
             WebCall make_post = new WebCall (endpoint, "collections/" + collection_alias + "/posts");
             make_post.set_post ();
             make_post.set_body (request_body);
-            make_post.add_header ("Authorization", "Token %s".printf (auth_token));
+            make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
 
             make_post.perform_call ();
 
@@ -298,18 +300,21 @@ namespace Medium {
         }
 
         public bool publish_post (
-            out string token,
+            out string url,
             out string id,
-            string body,
+            string content,
             string title,
-            string font = "serif",
-            string lang = "en",
-            bool rtl = false,
-            string created = "",
+            string publishStatus = "draft",
+            string format = "markdown",
+            bool notifyFollowers = false,
+            string[]? tags = null,
+            string publicationId = "",
+            string canonicalUrl = "",
+            string license = "",
             string user_token = "")
         {
             string auth_token = "";
-            token = "";
+            url = "";
             id = "";
             bool published_post = false;
             if (user_token == "" && authenticated_user != null) {
@@ -336,7 +341,7 @@ namespace Medium {
             make_post.set_post ();
             make_post.set_body (request_body);
             if (auth_token != "") {
-                make_post.add_header ("Authorization", "Token %s".printf (auth_token));
+                make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
             }
 
             make_post.perform_call ();
@@ -366,48 +371,6 @@ namespace Medium {
             return published_post;
         }
 
-        public bool render_markdown (out string formatted_markdown, string markdown) {
-            MarkdownRequestData body_data = new MarkdownRequestData ();
-            bool got_markdown = false;
-            body_data.raw_body = markdown;
-            formatted_markdown = "";
-
-            WebCall render_markdown = new WebCall (endpoint, RENDER_MARKDOWN);
-            render_markdown.set_post ();
-
-            Json.Node root = Json.gobject_serialize (body_data);
-            Json.Generator generate = new Json.Generator ();
-            generate.set_root (root);
-            generate.set_pretty (false);
-            string request_body = generate.to_data (null);
-
-            render_markdown.set_body (request_body);
-            render_markdown.perform_call ();
-
-            try {
-                Json.Parser parser = new Json.Parser ();
-                parser.load_from_data (render_markdown.response_str);
-                Json.Node data = parser.get_root ();
-                MarkdownResponse response = Json.gobject_deserialize (
-                    typeof (MarkdownResponse),
-                    data)
-                    as MarkdownResponse;
-
-                if (response != null) {
-                    if (response.code == 200) {
-                        formatted_markdown = response.data.body;
-                        got_markdown = true;
-                    } else {
-                        warning ("Error: %s", response.error_msg);
-                    }
-                }
-            } catch (Error e) {
-                warning ("Unable to get markdown: %s", e.message);
-            }
-
-            return got_markdown;
-        }
-
         public bool get_user_collections (ref GLib.List<Collection> collections, string user_token = "") {
             string auth_token = "";
             bool got_collections = false;
@@ -423,7 +386,7 @@ namespace Medium {
 
             WebCall collection_call = new WebCall (endpoint, "me/collections");
             collection_call.set_get ();
-            collection_call.add_header ("Authorization", "Token %s".printf (auth_token));
+            collection_call.add_header ("Authorization", "Bearer %s".printf (auth_token));
 
             bool res = collection_call.perform_call ();
             debug ("Got bytes: %d", res ? collection_call.response_str.length : 0);
@@ -474,7 +437,7 @@ namespace Medium {
 
             WebCall post_call = new WebCall (endpoint, "me/posts");
             post_call.set_get ();
-            post_call.add_header ("Authorization", "Token %s".printf (auth_token));
+            post_call.add_header ("Authorization", "Bearer %s".printf (auth_token));
 
             bool res = post_call.perform_call ();
             debug ("Got bytes: %d", res ? post_call.response_str.length : 0);
@@ -562,7 +525,7 @@ namespace Medium {
 
             WebCall authentication = new WebCall (endpoint, USER);
             authentication.set_get ();
-            authentication.add_header ("Authorization", "Token %s".printf (auth_token));
+            authentication.add_header ("Authorization", "Bearer %s".printf (auth_token));
 
             bool res = authentication.perform_call ();
             debug ("Got bytes: %d", res ? authentication.response_str.length : 0);
@@ -580,6 +543,9 @@ namespace Medium {
                     if (response.code == 200) {
                         logged_in = true;
                         username = response.data.username;
+                        authenticated_user = response.data.username;
+                        authenticated_user_id = response.data.id;
+                        authenticated_user_url = response.data.url;
                     } else {
                         warning ("Error: %s", response.error_msg);
                     }
@@ -596,41 +562,14 @@ namespace Medium {
             string password,
             out string access_token) throws GLib.Error
         {
+            string user = "";
             access_token = "";
 
-            bool logged_in = false;
-            Login login_request = new Login ();
-            login_request.alias = alias;
-            login_request.pass = password;
+            bool logged_in = get_authenticated_user (out user, password);
 
-            Json.Node root = Json.gobject_serialize (login_request);
-            Json.Generator generate = new Json.Generator ();
-            generate.set_root (root);
-            generate.set_pretty (false);
-            string request_body = generate.to_data (null);
-
-            WebCall authentication = new WebCall (endpoint, "auth/login");
-            authentication.set_body (request_body);
-            authentication.set_post ();
-            bool res = authentication.perform_call ();
-            debug ("Got bytes: %d", res ? authentication.response_str.length : 0);
-
-            Json.Parser parser = new Json.Parser ();
-            parser.load_from_data (authentication.response_str);
-            Json.Node data = parser.get_root ();
-            LoginResponse response = Json.gobject_deserialize (
-                typeof (LoginResponse),
-                data)
-                as LoginResponse;
-
-            if (response != null) {
-                if (response.code == 200) {
-                    logged_in = true;
-                    access_token = response.data.access_token;
-                    authenticated_user = response.data.access_token;
-                } else {
-                    warning ("Error: %s", response.error_msg);
-                }
+            if (logged_in) {
+                access_token = password;
+                authenticated_user = password;
             }
 
             return logged_in;
@@ -650,7 +589,7 @@ namespace Medium {
 
             WebCall authentication = new WebCall (endpoint, LOGOUT);
             authentication.set_delete ();
-            authentication.add_header ("Authorization", "Token %s".printf (auth_token));
+            authentication.add_header ("Authorization", "Bearer %s".printf (auth_token));
 
             bool res = authentication.perform_call ();
             debug ("Got bytes: %d", res ? authentication.response_str.length : 0);
@@ -678,8 +617,6 @@ namespace Medium {
     }
 
     public class Response : GLib.Object, Json.Serializable {
-        public int code { get; set; }
-        public string error_msg { get; set; }
     }
 
     public class PostResponse : Response {
@@ -688,10 +625,6 @@ namespace Medium {
 
     public class ImageResponse : Response {
         public Image data { get; set; }
-    }
-
-    public class MarkdownResponse : Response {
-        public MarkdownData data { get; set; }
     }
 
     public class MarkdownData : GLib.Object, Json.Serializable {
@@ -711,18 +644,15 @@ namespace Medium {
 
     public class Post : GLib.Object, Json.Serializable {
         public string id { get; set; }
-        public string slug { get; set; }
-        public string appearance {get; set; }
-        public string language { get; set; }
-        public bool rtl { get; set; }
-        public string created { get; set; }
-        public string updated { get; set; }
         public string title { get; set; }
-        public string body { get; set; }
+        public string authorId { get; set; }
         public string[] tags { get; set; }
-        public int views { get; set; }
-        public Collection collection { get; set; }
-        public string token { get; set; }
+        public string url { get; set; }
+        public string canonicalUrl { get; set; }
+        public string publishStatus { get; set; }
+        public string publishedAt { get; set; }
+        public string license { get; set; }
+        public bool licenseUrl { get; set; }
     }
 
     public class Collection : GLib.Object, Json.Serializable {
@@ -742,7 +672,11 @@ namespace Medium {
     }
 
     public class MeData : GLib.Object, Json.Serializable {
+        public string id { get; set; }
         public string username { get; set; }
+        public string name { get; set; }
+        public string url { get; set; }
+        public string imageUrl { get; set; }
     }
 
     private class Login : GLib.Object, Json.Serializable {

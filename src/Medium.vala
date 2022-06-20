@@ -248,6 +248,7 @@ namespace Medium {
             new_post.content = content;
             new_post.title = title;
             new_post.contentFormat = format;
+            new_post.publishStatus = publishStatus;
             if (license != "") {
                 new_post.license = license;
             }
@@ -265,7 +266,8 @@ namespace Medium {
             generate.set_pretty (false);
             string request_body = generate.to_data (null);
 
-            WebCall make_post = new WebCall (endpoint, "posts");
+            string api_path = "users/%s/posts".printf (authenticated_user_id);
+            WebCall make_post = new WebCall (endpoint, api_path);
             make_post.set_post ();
             make_post.set_body (request_body);
             if (auth_token != "") {
@@ -273,6 +275,7 @@ namespace Medium {
             }
 
             if (!make_post.perform_call ()) {
+                warning ("Error: %u, %s", make_post.response_code, make_post.response_str);
                 return false;
             }
 
@@ -397,7 +400,7 @@ namespace Medium {
                 if (response != null) {
                     logged_in = true;
                     username = response.data.username;
-                    authenticated_user = response.data.username;
+                    authenticated_user = auth_token;
                     authenticated_user_id = response.data.id;
                     authenticated_user_url = response.data.url;
                 }

@@ -1,6 +1,6 @@
 if get_option('enable_examples')
 
-  example_deps = libmedium_deps + [ libmedium_dep ]+ [ dependency('gtk+-3.0'), dependency('gtksourceview-3.0'), ]
+  example_deps = libmedium_deps + [ libmedium_dep ]
 
   executable('hello-medium', 'hello-medium.vala',
     dependencies: example_deps,

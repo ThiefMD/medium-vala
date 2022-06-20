@@ -22,17 +22,19 @@ public class HelloMedium {
                 print ("Logged in as: %s\n", my_username);
             }
 
-            string token;
+            string url;
             string id;
             if (client.publish_post (
-                out token,
+                out url,
                 out id,
-                "Hello World!",
-                "Hello Write.as!"))
-            {
-                print ("Made post: %s\n", id);
-            }
+                "# Hello Medium!
 
+Hello from [ThiefMD](https://thiefmd.com)!",
+                "Hello Medium!"))
+            {
+                print ("Made post: %s\n", url);
+            }
+/*
             Medium.Post n_post;
             if (client.get_post (out n_post, id)) {
                 print ("Found post %s, %s\n", n_post.title, n_post.created);
@@ -61,6 +63,7 @@ public class HelloMedium {
             if (client.logout ()) {
                 print ("Logged out\n");
             }
+            */
         } catch (Error e) {
             warning ("Failed: %s", e.message);
         }

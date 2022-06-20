@@ -84,17 +84,18 @@ namespace Medium {
 
             Soup.Buffer buffer = new Soup.Buffer.take(file_data);
             Soup.Multipart multipart = new Soup.Multipart("multipart/form-data");
-            multipart.append_form_file ("file", upload_file.get_path (), file_mimetype, buffer);
+            multipart.append_form_file ("image", upload_file.get_basename (), file_mimetype, buffer);
             // multipart.append_form_string ("ref", Soup.URI.encode(upload_file.get_basename ()), file_mimetype, buffer);
 
             WebCall call = new WebCall (endpoint, IMAGE_UPLOAD);
             call.set_multipart (multipart);
-            call.add_header ("Authorization", "%s".printf (auth_token));
+            call.add_header ("Authorization", "Bearer %s".printf (auth_token));
             call.perform_call ();
 
             if (call.response_code >= 200 && call.response_code < 300) {
                 result = true;
             } else {
+                warning ("Error (%u): %s", call.response_code, call.response_str);
                 return false;
             }
 
@@ -568,7 +569,6 @@ namespace Medium {
 
         public void set_multipart (Soup.Multipart multipart) {
             message = Soup.Form.request_new_from_multipart (url, multipart);
-            add_header ("Content-Type", Soup.FORM_MIME_TYPE_MULTIPART);
             is_mime = true;
         }
 

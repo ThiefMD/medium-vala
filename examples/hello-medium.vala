@@ -1,7 +1,7 @@
 public class HelloMedium {
     public static int main (string[] args) {
-        string user = "username";
-        string password = "password";
+        string user = "user";
+        string password = "Integration token";
 
         try {
             Medium.Client client = new Medium.Client ();
@@ -34,36 +34,6 @@ Hello from [ThiefMD](https://thiefmd.com)!",
             {
                 print ("Made post: %s\n", url);
             }
-/*
-            Medium.Post n_post;
-            if (client.get_post (out n_post, id)) {
-                print ("Found post %s, %s\n", n_post.title, n_post.created);
-            }
-
-            GLib.List<Medium.Post> posts = new GLib.List<Medium.Post> ();
-            if (client.get_user_posts (ref posts)) {
-                print ("Found %u posts\n", posts.length ());
-                foreach (var post in posts) {
-                    print ("\t%s on %s\n", post.title, post.created);
-                }
-            }
-
-            if (client.delete_post (id, token)) {
-                print ("Deleted post %s\n", id);
-            }
-
-            GLib.List<Medium.Collection> collections = new GLib.List<Medium.Collection> ();
-            if (client.get_user_collections (ref collections)) {
-                print ("Found %u collections\n", collections.length ());
-                foreach (var collection in collections) {
-                    print ("\t%s\n", collection.title);
-                }
-            }
-
-            if (client.logout ()) {
-                print ("Logged out\n");
-            }
-            */
         } catch (Error e) {
             warning ("Failed: %s", e.message);
         }

@@ -120,107 +120,6 @@ namespace Medium {
             return result;
         }
 
-        public bool update_post (
-            string post_id,
-            string token,
-            string body,
-            string title,
-            string font = "serif",
-            string lang = "en",
-            bool rtl = false,
-            string user_token = "")
-        {
-            bool post_updated = false;
-            string auth_token = "";
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (token == "" && auth_token == "") {
-                warning ("No valid way to authenticate to update post");
-                return false;
-            }
-
-            PostUpdateRequestData post_update = new PostUpdateRequestData ();
-            post_update.token = token;
-            post_update.body = body;
-            post_update.title = title;
-            post_update.font = font;
-            post_update.lang = lang;
-            post_update.rtl = rtl;
-
-            Json.Node root = Json.gobject_serialize (post_update);
-            Json.Generator generate = new Json.Generator ();
-            generate.set_root (root);
-            generate.set_pretty (false);
-            string request_body = generate.to_data (null);
-
-            WebCall make_post = new WebCall (endpoint, "posts/" + post_id);
-            make_post.set_get ();
-            make_post.set_body (request_body);
-            if (auth_token != "") {
-                make_post.add_header ("Authorization", "Bearer %s".printf (auth_token));
-            }
-
-            if (!make_post.perform_call ()) {
-                return false;
-            }
-
-            try {
-                Json.Parser parser = new Json.Parser ();
-                parser.load_from_data (make_post.response_str);
-                Json.Node data = parser.get_root ();
-                PostResponse response = Json.gobject_deserialize (
-                    typeof (PostResponse),
-                    data)
-                    as PostResponse;
-
-                if (response != null) {
-                    post_updated = true;
-                }
-            } catch (Error e) {
-                warning ("Unable to validate token: %s", e.message);
-            }
-
-            return post_updated;
-        }
-
-        public bool get_post (out Post post, string post_id)
-        {
-            bool post_obtained = false;
-            post = null;
-            if (post_id == "") {
-                return false;
-            }
-
-            WebCall get_existing_post = new WebCall (endpoint, "posts/" + post_id);
-            get_existing_post.set_get ();
-            if (!get_existing_post.perform_call ()) {
-                return false;
-            }
-
-            try {
-                Json.Parser parser = new Json.Parser ();
-                parser.load_from_data (get_existing_post.response_str);
-                Json.Node data = parser.get_root ();
-                PostResponse response = Json.gobject_deserialize (
-                    typeof (PostResponse),
-                    data)
-                    as PostResponse;
-
-                if (response != null) {
-                    post_obtained = true;
-                    post = response.data;
-                }
-            } catch (Error e) {
-                warning ("Unable to validate token: %s", e.message);
-            }
-
-            return post_obtained;
-        }
-
         public bool publish_post (
             out string url,
             out string id,
@@ -301,69 +200,6 @@ namespace Medium {
             return published_post;
         }
 
-        public bool get_user_collections (ref GLib.List<Collection> collections, string user_token = "") {
-            string auth_token = "";
-            bool got_collections = false;
-            if (user_token == "" && authenticated_user != null) {
-                auth_token = authenticated_user;
-            } else {
-                auth_token = user_token;
-            }
-
-            if (auth_token == "") {
-                return false;
-            }
-
-            WebCall collection_call = new WebCall (endpoint, "me/collections");
-            collection_call.set_get ();
-            collection_call.add_header ("Authorization", "Bearer %s".printf (auth_token));
-
-            bool res = collection_call.perform_call ();
-            debug ("Got bytes: %d", res ? collection_call.response_str.length : 0);
-
-            if (!res) {
-                return false;
-            }
-
-            try {
-                Json.Parser parser = new Json.Parser ();
-                parser.load_from_data (collection_call.response_str);
-                Json.Node data = parser.get_root ();
-                var json_obj = parser.get_root ().get_object ();
-                UserCollections response = Json.gobject_deserialize (
-                    typeof (UserCollections),
-                    data)
-                    as UserCollections;
-
-                if (response != null) {
-                    var collection_data = json_obj.get_array_member ("data");
-                    foreach (var co in collection_data.get_elements ()) {
-                        var c_p = co.get_object ();
-                        Collection c = new Collection ();
-                        deserialize_collection (ref c, c_p);
-                        collections.append (c);
-                    }
-                    got_collections = true;
-                }
-            } catch (Error e) {
-                warning ("Unable to get user collections: %s", e.message);
-            }
-
-            return got_collections;
-        }
-
-        private void deserialize_collection (ref Collection c, Json.Object c_p) {
-            c.alias = c_p.has_member ("alias") ? c_p.get_string_member ("alias") : "";
-            c.title = c_p.has_member ("title") ? c_p.get_string_member ("title") : "";
-            c.description  = c_p.has_member ("description") ? c_p.get_string_member ("description") : "";
-            c.style_sheet = c_p.has_member ("style_sheet") ? c_p.get_string_member ("style_sheet") : "";
-            c.public = c_p.has_member ("public") ? c_p.get_boolean_member ("public") : false;
-            c.views = (int) (c_p.has_member ("views") ? c_p.get_int_member ("views") : 0);
-            c.email = c_p.has_member ("email") ? c_p.get_string_member ("email") : "";
-            c.url = c_p.has_member ("url") ? c_p.get_string_member ("url") : "";
-            c.monetization_pointer = c_p.has_member ("monetization_pointer") ? c_p.get_string_member ("monetization_pointer") : "";
-        }
-
         public bool get_authenticated_user (out string username, string user_token = "") {
             username = "";
             bool logged_in = false;
@@ -442,16 +278,6 @@ namespace Medium {
         public Image data { get; set; }
     }
 
-    public class MarkdownData : GLib.Object, Json.Serializable {
-        public string body { get; set; }
-    }
-
-    public class UserPosts : Response {
-    }
-
-    public class UserCollections : Response {
-    }
-
     public class Image : GLib.Object, Json.Serializable {
         public string url { get; set; }
         public string md5 { get; set; }
@@ -470,18 +296,6 @@ namespace Medium {
         public bool licenseUrl { get; set; }
     }
 
-    public class Collection : GLib.Object, Json.Serializable {
-        public string alias { get; set; }
-        public string title { get; set; }
-        public string description { get; set; }
-        public string style_sheet  { get; set; }
-        public bool @public { get; set; }
-        public int views { get; set; }
-        public string email { get; set; }
-        public string url { get; set; }
-        public string monetization_pointer { get; set; }
-    }
-
     public class MeResponse : Response {
         public MeData data { get; set; }
     }
@@ -494,24 +308,6 @@ namespace Medium {
         public string imageUrl { get; set; }
     }
 
-    private class Login : GLib.Object, Json.Serializable {
-        public string alias { get; set; }
-        public string pass { get; set; }
-    }
-
-    public class LoginResponse : Response {
-        public LoginData data { get; set; }
-    }
-
-    private class PostClaimData : GLib.Object, Json.Serializable {
-        public string token { get; set; }
-        public string id { get; set; }
-    }
-
-    private class PostDeleteData : GLib.Object, Json.Serializable {
-        public string token { get; set; }
-    }
-
     private class PostRequestData : GLib.Object, Json.Serializable {
         public string title { get; set; }
         public string contentFormat { get; set; }
@@ -521,30 +317,6 @@ namespace Medium {
         public string publishStatus { get; set; }
         public string? license { get; set; }
         public bool notifyFollowers { get; set; }
-    }
-
-    private class PostUpdateRequestData : GLib.Object, Json.Serializable {
-        public string token { get; set; }
-        public string body { get; set; }
-        public string title { get; set; }
-        public string font { get; set; }
-        public string lang { get; set; }
-        public bool rtl { get; set; }
-    }
-
-    private class MarkdownRequestData : GLib.Object, Json.Serializable {
-        public string raw_body { get; set; }
-    }
-
-    public class LoginData : GLib.Object, Json.Serializable {
-        public string access_token { get; set; }
-        public UserData user { get; set; }
-    }
-
-    public class UserData : GLib.Object, Json.Serializable {
-        public string username { get; set; }
-        public string email { get; set; }
-        public string created { get; set; }
     }
 
     private class WebCall {

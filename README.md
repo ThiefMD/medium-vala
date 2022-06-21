@@ -34,4 +34,59 @@ string password = "password";
 
 # Quick Start
 
-TBD
+
+## New Login
+
+```vala
+string user = "user";
+string key = "integration-key";
+
+Medium.Client client = new Medium.Client ();
+if (client.authenticate (
+        user,
+        key))
+{
+    print ("Successfully logged in");
+} else {
+    print ("Could not login");
+}
+```
+
+## Check Logged in User
+
+```vala
+string my_username;
+if (client.get_authenticated_user (out my_username)) {
+    print ("Logged in as: %s", my_username);
+}
+```
+
+## Publish a Post
+
+```vala
+string url;
+string id;
+if (client.publish_post (
+    out url,
+    out id,
+    "# Hello Medium!
+
+Hello from [ThiefMD](https://thiefmd.com)!",
+    "Hello Medium!"))
+{
+    print ("Made post: %s", url);
+}
+```
+
+## Upload an Image
+
+```vala
+string file_url = "";
+if (client.upload_image_simple (
+    out file_url,
+    "/home/user/Pictures/photo.png"
+))
+{
+    print ("Uploaded: %s", file_url);
+}
+```

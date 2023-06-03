@@ -6,6 +6,8 @@ Unofficial [Medium](https://medium.com) API client library for Vala. Still a wor
 
 I recommend including `medium-vala` as a git submodule and adding `medium-vala/src/Medium.vala` to your sources list. This will avoid packaging conflicts and remote build system issues until I learn a better way to suggest this.
 
+For libsoup3, use `medium-vala/src/Medium3.vala`.
+
 ### Requirements
 
 ```

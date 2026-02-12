@@ -329,7 +329,7 @@ namespace Medium {
         public string response_str;
         public uint response_code;
 
-        public class WebCall (string endpoint, string api) {
+        public WebCall (string endpoint, string api) {
             url = endpoint + api;
             session = new Soup.Session ();
             body = "";
